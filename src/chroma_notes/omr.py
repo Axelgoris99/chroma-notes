@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import gc
 import os
 import pickle
 import tempfile
 from argparse import Namespace
+from collections import OrderedDict
 from dataclasses import dataclass
 
 import cv2
@@ -19,53 +21,64 @@ class NoteDetection:
     pitch_class: str  # one of C D E F G A B
 
 
-# ── ONNX session cache (persists across pages within one process) ──────────────
+# LRU session cache — keep at most 1 model loaded at a time to cap peak memory.
+# Two simultaneous ONNX sessions can exhaust a 6 GB container on CPU-only VPS.
+_MAX_CACHED_SESSIONS = 1
+_session_cache: OrderedDict[str, dict] = OrderedDict()
 
-_session_cache: dict[str, object] = {}
+
+def _get_or_load_session(onnx_path: str, model_path: str) -> dict:
+    import onnxruntime as rt
+
+    if onnx_path in _session_cache:
+        _session_cache.move_to_end(onnx_path)
+        return _session_cache[onnx_path]
+
+    # Evict oldest session(s) before loading a new one
+    while len(_session_cache) >= _MAX_CACHED_SESSIONS:
+        _, evicted = _session_cache.popitem(last=False)
+        del evicted["sess"]
+        gc.collect()
+
+    meta = pickle.load(open(os.path.join(model_path, "metadata.pkl"), "rb"))
+    providers = [("CUDAExecutionProvider", {"device_id": 0}), "CPUExecutionProvider"]
+    sess = rt.InferenceSession(onnx_path, providers=providers)
+    active = sess.get_providers()
+    print(f"  Loaded {os.path.basename(onnx_path)} -> {active[0]}")
+
+    entry = {
+        "sess": sess,
+        "output_names": meta["output_names"],
+        "input_shape": meta["input_shape"],
+        "output_shape": meta["output_shape"],
+    }
+    _session_cache[onnx_path] = entry
+    return entry
 
 
 def _patch_oemer_sessions() -> None:
     import oemer.inference as _oi
-    import onnxruntime as rt
 
-    # oemer targets ~3.675M pixels per image; cap at 2M to halve accumulation array memory
-    _original_resize = _oi.resize_image
+    # oemer targets ~3.675M pixels per image; cap at 1.5M to reduce working-array memory
     def _capped_resize(image):
         from PIL import Image as _Image
         w, h = image.size
-        if w * h <= 2_000_000:
+        if w * h <= 1_500_000:
             return image
-        ratio = (2_000_000 / (w * h)) ** 0.5
+        ratio = (1_500_000 / (w * h)) ** 0.5
         return image.resize((round(ratio * w), round(ratio * h)), _Image.LANCZOS)
     _oi.resize_image = _capped_resize
 
     original = _oi.inference
 
-    def _cached(model_path, img_path, step_size=128, batch_size=16,
-                 manual_th=None, use_tf=False):
+    def _cached(model_path, img_path, step_size=128, batch_size=4,
+                manual_th=None, use_tf=False):
         if use_tf:
             return original(model_path, img_path, step_size, batch_size,
                             manual_th, use_tf)
 
         onnx_path = os.path.join(model_path, "model.onnx")
-        if onnx_path not in _session_cache:
-            meta = pickle.load(
-                open(os.path.join(model_path, "metadata.pkl"), "rb")
-            )
-            providers = [
-                ("CUDAExecutionProvider", {"device_id": 0}),
-                "CPUExecutionProvider",
-            ]
-            _session_cache[onnx_path] = {
-                "sess": rt.InferenceSession(onnx_path, providers=providers),
-                "output_names": meta["output_names"],
-                "input_shape": meta["input_shape"],
-                "output_shape": meta["output_shape"],
-            }
-            active = _session_cache[onnx_path]["sess"].get_providers()
-            print(f"  Loaded {os.path.basename(onnx_path)} → {active[0]}")
-
-        cached = _session_cache[onnx_path]
+        cached = _get_or_load_session(onnx_path, model_path)
         sess = cached["sess"]
         output_names = cached["output_names"]
         input_shape = cached["input_shape"]
@@ -77,38 +90,38 @@ def _patch_oemer_sessions() -> None:
         image = np.array(image_pil)
 
         win_size = input_shape[1]
-        patches = []
+
+        # Pre-compute patch coordinates
+        coords: list[tuple[int, int]] = []
         for y in range(0, image.shape[0], step_size):
             if y + win_size > image.shape[0]:
                 y = image.shape[0] - win_size
             for x in range(0, image.shape[1], step_size):
                 if x + win_size > image.shape[1]:
                     x = image.shape[1] - win_size
-                patches.append(image[y:y + win_size, x:x + win_size])
+                coords.append((y, x))
 
-        pred = []
-        for i in range(0, len(patches), batch_size):
-            batch = np.array(patches[i:i + batch_size])
-            print(f"    {i + 1}/{len(patches)}", end="\r")
-            out = sess.run(output_names, {"input": batch})[0]
-            pred.append(out)
+        patches = [image[y:y + win_size, x:x + win_size] for y, x in coords]
 
         out_shape = image.shape[:2] + (output_shape[-1],)
         out = np.zeros(out_shape, dtype=np.float32)
         mask = np.zeros(out_shape, dtype=np.float32)
-        idx = 0
-        for y in range(0, image.shape[0], step_size):
-            if y + win_size > image.shape[0]:
-                y = image.shape[0] - win_size
-            for x in range(0, image.shape[1], step_size):
-                if x + win_size > image.shape[1]:
-                    x = image.shape[1] - win_size
-                b, r = divmod(idx, batch_size)
-                out[y:y + win_size, x:x + win_size] += pred[b][r]
-                mask[y:y + win_size, x:x + win_size] += 1
-                idx += 1
 
+        # Assemble predictions incrementally — never accumulate the full pred list
+        for i in range(0, len(patches), batch_size):
+            batch_coords = coords[i:i + batch_size]
+            batch = np.array(patches[i:i + batch_size])
+            print(f"    {i + 1}/{len(patches)}", end="\r")
+            batch_out = sess.run(output_names, {"input": batch})[0]
+            for j, (y, x) in enumerate(batch_coords):
+                out[y:y + win_size, x:x + win_size] += batch_out[j]
+                mask[y:y + win_size, x:x + win_size] += 1
+            del batch, batch_out
+
+        del patches
         out /= mask
+        del mask
+
         if manual_th is None:
             return np.argmax(out, axis=-1), out
 
@@ -152,7 +165,7 @@ def detect_notes(img_path: str) -> list[NoteDetection]:
     clefs = layers.get_layer("clefs")
     oemer_img = layers.get_layer("original_image")  # resized image oemer worked on
 
-    # Map oemer's internal pixel space → input image pixel space
+    # Map oemer's internal pixel space -> input image pixel space
     orig = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
     if orig is not None and oemer_img is not None:
         H_orig, W_orig = orig.shape[:2]
@@ -161,7 +174,7 @@ def detect_notes(img_path: str) -> list[NoteDetection]:
     else:
         sx, sy = 1.0, 1.0
 
-    # Build track → clef_type lookup
+    # Build track -> clef_type lookup
     track_clef: dict[int, ClefType] = {}
     if clefs is not None:
         for clef in clefs:
