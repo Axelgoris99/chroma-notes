@@ -339,6 +339,11 @@
     if (!jobId) return;
     try {
       const res = await fetch('/status/' + jobId);
+      if (res.status === 404) {
+        clearInterval(pollTimer);
+        render({ status: 'failed', error: 'The server restarted while your file was processing. Please resubmit.' });
+        return;
+      }
       const data = await res.json();
       render(data);
     } catch {}

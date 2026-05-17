@@ -8,7 +8,7 @@ import fitz
 from .omr import detect_notes
 from .overlay import ColorMap, apply_overlays
 
-RENDER_DPI = 150  # higher → better OMR accuracy, slower
+RENDER_DPI = 120  # higher → better OMR accuracy, slower
 
 
 def process_pdf(input_path: str, output_path: str, colors: ColorMap | None = None) -> None:

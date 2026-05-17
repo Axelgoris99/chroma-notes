@@ -5,6 +5,7 @@ services:
     volumes:
       - jobs_data:/app/jobs
     restart: unless-stopped
+    mem_limit: 6g
     environment:
       - JOBS_DIR=/app/jobs
     networks:
