@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chroma Notes — Boomwhacker PDF Colorizer</title>
+<style>
+  :root {
+    --bg: #111118;
+    --surface: #1a1a26;
+    --border: #2a2a40;
+    --text: #e8e8f0;
+    --muted: #7a7a99;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 3rem 1rem 4rem;
+  }
+
+  .rainbow-bar {
+    width: 100%;
+    max-width: 600px;
+    height: 5px;
+    border-radius: 3px;
+    background: linear-gradient(to right, #de2424, #ed8f21, #f2e81a, #78de33, #1a942e, #8c21b8, #e88cbf);
+    margin-bottom: 2.5rem;
+  }
+
+  h1 { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; text-align: center; }
+  .subtitle { color: var(--muted); margin-top: 0.4rem; margin-bottom: 2.5rem; text-align: center; font-size: 0.95rem; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 600px;
+  }
+
+  /* Color picker grid */
+  .pickers-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 0.75rem;
+  }
+  .pickers {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1.75rem;
+  }
+  .picker-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .picker-item label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .picker-item input[type="color"] {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    padding: 2px;
+    background: transparent;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .picker-item input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; border-radius: 50%; }
+  .picker-item input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; }
+  .picker-item input[type="color"]::-moz-color-swatch { border: none; border-radius: 50%; }
+
+  /* Drop zone */
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 2.5rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    user-select: none;
+  }
+  .drop-zone:hover, .drop-zone.over {
+    border-color: #8c21b8;
+    background: rgba(140,33,184,0.05);
+  }
+  .drop-zone .icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+  .drop-zone strong { font-size: 1rem; }
+  .drop-zone p { color: var(--muted); font-size: 0.85rem; margin-top: 0.4rem; }
+
+  /* Progress bar */
+  .bar-wrap {
+    height: 5px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 1.25rem;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(to right, #8c21b8, #e88cbf);
+    transition: width 0.4s ease;
+    width: 0%;
+  }
+
+  /* Status section */
+  .status-section { display: none; }
+  .status-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 0.3rem;
+  }
+  .status-value { font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; }
+  .queue-note { color: var(--muted); font-size: 0.85rem; margin-top: 0.25rem; }
+
+  .status-pending   { color: #ed8f21; }
+  .status-processing { color: #f2e81a; }
+  .status-done      { color: #1a942e; }
+  .status-failed    { color: #de2424; }
+
+  /* Spinner */
+  .spin {
+    display: inline-block;
+    width: 15px; height: 15px;
+    border: 2px solid var(--border);
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.7rem 1.4rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    text-decoration: none;
+    transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-green  { background: #1a942e; color: #fff; }
+  .btn-ghost  { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+
+  .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1.5rem; }
+
+  .error-msg { color: #de2424; font-size: 0.88rem; margin-top: 0.75rem; }
+  .hidden { display: none !important; }
+
+  footer {
+    margin-top: 2rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="rainbow-bar"></div>
+<h1>Chroma Notes</h1>
+<p class="subtitle">Upload a sheet music PDF — get it back with every note colored by Boomwhacker</p>
+
+<div class="card">
+
+  <!-- Upload section -->
+  <div id="upload-section">
+    <p class="pickers-label">Note colors</p>
+    <div class="pickers" id="pickers"></div>
+
+    <div class="drop-zone" id="drop-zone">
+      <div class="icon">🎼</div>
+      <strong>Drop your sheet music PDF here</strong>
+      <p>or click to browse &nbsp;·&nbsp; max 50 MB</p>
+      <input type="file" id="file-input" accept=".pdf" style="display:none">
+    </div>
+    <div class="bar-wrap hidden" id="upload-bar-wrap">
+      <div class="bar-fill" id="upload-bar"></div>
+    </div>
+    <p class="error-msg hidden" id="upload-error"></p>
+  </div>
+
+  <!-- Status section -->
+  <div class="status-section" id="status-section">
+    <div class="status-label">Status</div>
+    <div class="status-value" id="status-value"></div>
+    <div class="queue-note hidden" id="queue-note"></div>
+    <div class="bar-wrap" style="margin-top:0.9rem">
+      <div class="bar-fill" id="status-bar"></div>
+    </div>
+    <p class="error-msg hidden" id="status-error"></p>
+    <div class="actions">
+      <a id="download-btn" class="btn btn-green hidden" download>↓ Download colored PDF</a>
+      <button class="btn btn-ghost" onclick="reset()">Process another</button>
+    </div>
+  </div>
+
+</div>
+
+<footer>Free to use · Files deleted after 2 hours</footer>
+
+<script>
+  const NOTES = [
+    { key: 'C', label: 'C\nDo',  default: '#de2424' },
+    { key: 'D', label: 'D\nRé',  default: '#ed8f21' },
+    { key: 'E', label: 'E\nMi',  default: '#f2e81a' },
+    { key: 'F', label: 'F\nFa',  default: '#78de33' },
+    { key: 'G', label: 'G\nSol', default: '#1a942e' },
+    { key: 'A', label: 'A\nLa',  default: '#8c21b8' },
+    { key: 'B', label: 'B\nSi',  default: '#e88cbf' },
+  ];
+
+  // Build pickers
+  const pickersEl = document.getElementById('pickers');
+  NOTES.forEach(n => {
+    const item = document.createElement('div');
+    item.className = 'picker-item';
+    const input = document.createElement('input');
+    input.type = 'color';
+    input.value = n.default;
+    input.id = 'color-' + n.key;
+    const label = document.createElement('label');
+    label.htmlFor = 'color-' + n.key;
+    label.style.whiteSpace = 'pre';
+    label.textContent = n.label;
+    item.appendChild(input);
+    item.appendChild(label);
+    pickersEl.appendChild(item);
+  });
+
+  function getColors() {
+    const obj = {};
+    NOTES.forEach(n => { obj[n.key] = document.getElementById('color-' + n.key).value; });
+    return obj;
+  }
+
+  const dropZone    = document.getElementById('drop-zone');
+  const fileInput   = document.getElementById('file-input');
+  const uploadSec   = document.getElementById('upload-section');
+  const statusSec   = document.getElementById('status-section');
+  const statusVal   = document.getElementById('status-value');
+  const queueNote   = document.getElementById('queue-note');
+  const statusBar   = document.getElementById('status-bar');
+  const uploadBar   = document.getElementById('upload-bar');
+  const uploadBarW  = document.getElementById('upload-bar-wrap');
+  const downloadBtn = document.getElementById('download-btn');
+  const uploadErr   = document.getElementById('upload-error');
+  const statusErr   = document.getElementById('status-error');
+
+  let jobId = null;
+  let pollTimer = null;
+
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('over');
+    if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) uploadFile(fileInput.files[0]);
+  });
+
+  function showErr(el, msg) { el.textContent = msg; el.classList.remove('hidden'); }
+
+  function uploadFile(file) {
+    if (!file.name.toLowerCase().endsWith('.pdf')) { showErr(uploadErr, 'Only PDF files are accepted.'); return; }
+    if (file.size > 50 * 1024 * 1024) { showErr(uploadErr, 'File exceeds 50 MB limit.'); return; }
+
+    uploadErr.classList.add('hidden');
+    uploadBarW.classList.remove('hidden');
+    dropZone.style.pointerEvents = 'none';
+
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('colors_json', JSON.stringify(getColors()));
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/upload');
+    xhr.upload.onprogress = e => {
+      if (e.lengthComputable) uploadBar.style.width = (e.loaded / e.total * 100) + '%';
+    };
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        const data = JSON.parse(xhr.responseText);
+        jobId = data.job_id;
+        switchToStatus();
+        poll();
+        pollTimer = setInterval(poll, 3000);
+      } else {
+        let msg = 'Upload failed.';
+        try { msg = JSON.parse(xhr.responseText).detail || msg; } catch {}
+        uploadBarW.classList.add('hidden');
+        dropZone.style.pointerEvents = '';
+        showErr(uploadErr, msg);
+      }
+    };
+    xhr.onerror = () => {
+      uploadBarW.classList.add('hidden');
+      dropZone.style.pointerEvents = '';
+      showErr(uploadErr, 'Network error — please try again.');
+    };
+    xhr.send(fd);
+  }
+
+  function switchToStatus() {
+    uploadSec.style.display = 'none';
+    statusSec.style.display = 'block';
+  }
+
+  async function poll() {
+    if (!jobId) return;
+    try {
+      const res = await fetch('/status/' + jobId);
+      const data = await res.json();
+      render(data);
+    } catch {}
+  }
+
+  function render(data) {
+    statusVal.className = 'status-value status-' + data.status;
+
+    if (data.status === 'pending') {
+      statusVal.innerHTML = '<span class="spin"></span> Waiting in queue…';
+      if (data.queue_position != null) {
+        queueNote.textContent = 'Position #' + data.queue_position + ' in queue';
+        queueNote.classList.remove('hidden');
+      }
+      statusBar.style.width = '8%';
+    } else if (data.status === 'processing') {
+      statusVal.innerHTML = '<span class="spin"></span> Processing…';
+      queueNote.classList.add('hidden');
+      statusBar.style.width = '55%';
+    } else if (data.status === 'done') {
+      clearInterval(pollTimer);
+      statusVal.textContent = '✓ Done!';
+      queueNote.classList.add('hidden');
+      statusBar.style.width = '100%';
+      downloadBtn.href = '/download/' + jobId;
+      downloadBtn.classList.remove('hidden');
+    } else if (data.status === 'failed') {
+      clearInterval(pollTimer);
+      statusVal.textContent = 'Failed';
+      queueNote.classList.add('hidden');
+      statusBar.style.width = '0%';
+      showErr(statusErr, data.error || 'Processing failed. Try a different PDF.');
+    }
+  }
+
+  function reset() {
+    clearInterval(pollTimer);
+    jobId = null;
+    uploadSec.style.display = '';
+    statusSec.style.display = 'none';
+    uploadBarW.classList.add('hidden');
+    uploadBar.style.width = '0%';
+    statusBar.style.width = '0%';
+    downloadBtn.classList.add('hidden');
+    uploadErr.classList.add('hidden');
+    statusErr.classList.add('hidden');
+    queueNote.classList.add('hidden');
+    fileInput.value = '';
+    dropZone.style.pointerEvents = '';
+  }
+</script>
+</body>
+</html>

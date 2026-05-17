@@ -1,0 +1,9 @@
+.venv/
+jobs/
+input/
+output/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.git/

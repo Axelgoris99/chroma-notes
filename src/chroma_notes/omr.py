@@ -119,7 +119,7 @@ def detect_notes(img_path: str) -> list[NoteDetection]:
     """
     Run oemer's full OMR pipeline on one page image and return every notehead
     with its bounding box (in the input image's pixel coordinates) and pitch
-    class letter (C–B).
+    class letter (C-B).
     """
     from oemer import layers
     from oemer.ete import extract, clear_data
@@ -162,7 +162,7 @@ def detect_notes(img_path: str) -> list[NoteDetection]:
     for note in (notes if notes is not None else []):
         if note.bbox is None or note.staff_line_pos is None:
             continue
-        clef_type = track_clef.get(note.track, ClefType.G_CLEF)
+        clef_type = track_clef.get(note.track, ClefType(note.track % 2 + 1))
         pitch_class = get_chroma_pitch(note.staff_line_pos, clef_type)
         x1, y1, x2, y2 = note.bbox
         detections.append(NoteDetection(

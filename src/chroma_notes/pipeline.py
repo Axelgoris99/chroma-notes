@@ -6,12 +6,12 @@ from pathlib import Path
 import fitz
 
 from .omr import detect_notes
-from .overlay import apply_overlays
+from .overlay import ColorMap, apply_overlays
 
 RENDER_DPI = 150  # higher → better OMR accuracy, slower
 
 
-def process_pdf(input_path: str, output_path: str) -> None:
+def process_pdf(input_path: str, output_path: str, colors: ColorMap | None = None) -> None:
     doc = fitz.open(input_path)
     scale = 72.0 / RENDER_DPI  # pts per pixel
 
@@ -29,7 +29,7 @@ def process_pdf(input_path: str, output_path: str) -> None:
             detections = detect_notes(img_path)
             print(f"  {len(detections)} notes colored")
             if detections:
-                apply_overlays(page, detections, scale)
+                apply_overlays(page, detections, scale, colors=colors)
         except Exception as exc:
             print(f"  Skipped — {exc}")
         finally:

@@ -7,19 +7,20 @@ from .omr import NoteDetection
 
 FILL_OPACITY = 0.40
 
+ColorMap = dict[str, tuple[float, float, float]]
 
-def apply_overlays(page: fitz.Page, detections: list[NoteDetection], scale: float) -> None:
-    """
-    Draw translucent Boomwhacker circles over each detected notehead.
 
-    scale: points-per-pixel ratio (= 72 / render_dpi). Both PyMuPDF page
-    coordinates and the rendered image share a top-left origin with y going
-    downward, so no axis flip is needed.
-    """
+def apply_overlays(
+    page: fitz.Page,
+    detections: list[NoteDetection],
+    scale: float,
+    colors: ColorMap | None = None,
+) -> None:
+    palette = colors if colors is not None else BOOMWHACKER
     shape = page.new_shape()
 
     for det in detections:
-        color = BOOMWHACKER.get(det.pitch_class)
+        color = palette.get(det.pitch_class)
         if color is None:
             continue
 

@@ -1,4 +1,4 @@
-# Boomwhacker standard colors — RGB tuples in 0–1 range (for PyMuPDF)
+# Boomwhacker standard colors — RGB tuples in 0-1 range (for PyMuPDF)
 BOOMWHACKER: dict[str, tuple[float, float, float]] = {
     "C": (0.87, 0.14, 0.14),  # red
     "D": (0.93, 0.56, 0.13),  # orange
