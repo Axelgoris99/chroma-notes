@@ -61,3 +61,13 @@ The `docker-compose.yml` already points to `ghcr.io/axelgoris99/chroma-notes:lat
 git pull
 docker compose pull && docker compose up -d
 ```
+
+## FAQ
+
+"It does not work".
+
+Oof, tough one buddy. Unfortunately many things can go wrong, such as:
+
+- Oemer not recognizing the clef or the note which will lead to the wrong colors
+- The queue system messing up if you use the demo version at <chroma.goris.live/>
+- The server is busy with other stuff.
