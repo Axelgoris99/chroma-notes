@@ -25,9 +25,19 @@ _session_cache: dict[str, object] = {}
 
 
 def _patch_oemer_sessions() -> None:
-    """Replace oemer's per-call InferenceSession creation with cached sessions."""
     import oemer.inference as _oi
     import onnxruntime as rt
+
+    # oemer targets ~3.675M pixels per image; cap at 2M to halve accumulation array memory
+    _original_resize = _oi.resize_image
+    def _capped_resize(image):
+        from PIL import Image as _Image
+        w, h = image.size
+        if w * h <= 2_000_000:
+            return image
+        ratio = (2_000_000 / (w * h)) ** 0.5
+        return image.resize((round(ratio * w), round(ratio * h)), _Image.LANCZOS)
+    _oi.resize_image = _capped_resize
 
     original = _oi.inference
 
