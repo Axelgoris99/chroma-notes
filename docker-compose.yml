@@ -1,13 +1,19 @@
 services:
   web:
-    build: .
-    ports:
-      - "8000:8000"
+    image: ghcr.io/axelgoris99/chroma-notes:latest
+    container_name: chroma-notes
     volumes:
       - jobs_data:/app/jobs
     restart: unless-stopped
     environment:
       - JOBS_DIR=/app/jobs
+    networks:
+      - caddy
 
 volumes:
   jobs_data:
+
+networks:
+  caddy:
+    external: true
+    name: debian_default
