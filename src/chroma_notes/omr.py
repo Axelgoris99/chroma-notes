@@ -58,17 +58,6 @@ def _get_or_load_session(onnx_path: str, model_path: str) -> dict:
 
 def _patch_oemer_sessions() -> None:
     import oemer.inference as _oi
-
-    # oemer targets ~3.675M pixels per image; cap at 1.5M to reduce working-array memory
-    def _capped_resize(image):
-        from PIL import Image as _Image
-        w, h = image.size
-        if w * h <= 1_500_000:
-            return image
-        ratio = (1_500_000 / (w * h)) ** 0.5
-        return image.resize((round(ratio * w), round(ratio * h)), _Image.LANCZOS)
-    _oi.resize_image = _capped_resize
-
     original = _oi.inference
 
     def _cached(model_path, img_path, step_size=128, batch_size=4,
