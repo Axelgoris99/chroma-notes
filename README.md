@@ -14,6 +14,11 @@ Color-code every note in a sheet music PDF using [Boomwhacker](https://en.wikipe
 
 Powered by [oemer](https://github.com/BreezeWhite/oemer) for optical music recognition.
 
+
+Warning: The demo takes 5+ minutes for a 1 page pdf. It is running on a cheap 4vCpu VPS.
+But, there's a demo running at: <https://chroma.goris.live>
+
+
 ---
 
 ## Local CLI
