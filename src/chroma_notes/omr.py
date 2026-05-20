@@ -4,6 +4,7 @@ import gc
 import os
 import pickle
 import tempfile
+import time
 from argparse import Namespace
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -41,10 +42,14 @@ def _get_or_load_session(onnx_path: str, model_path: str) -> dict:
         gc.collect()
 
     meta = pickle.load(open(os.path.join(model_path, "metadata.pkl"), "rb"))
+    # opts = rt.SessionOptions()
+    # opts.graph_optimization_level = rt.GraphOptimizationLevel.ORT_ENABLE_ALL
+    # opts.intra_op_num_threads = os.cpu_count() or 1
     providers = [("CUDAExecutionProvider", {"device_id": 0}), "CPUExecutionProvider"]
+    t0 = time.perf_counter()
     sess = rt.InferenceSession(onnx_path, providers=providers)
     active = sess.get_providers()
-    print(f"  Loaded {os.path.basename(onnx_path)} -> {active[0]}")
+    print(f"  Loaded {os.path.basename(onnx_path)} via {active[0]} in {time.perf_counter() - t0:.1f}s")
 
     entry = {
         "sess": sess,
@@ -97,15 +102,20 @@ def _patch_oemer_sessions() -> None:
         mask = np.zeros(out_shape, dtype=np.float32)
 
         # Assemble predictions incrementally — never accumulate the full pred list
+        n_batches = (len(patches) + batch_size - 1) // batch_size
+        t_infer_start = time.perf_counter()
         for i in range(0, len(patches), batch_size):
             batch_coords = coords[i:i + batch_size]
             batch = np.array(patches[i:i + batch_size])
-            print(f"    {i + 1}/{len(patches)}", end="\r")
+            batch_num = i // batch_size + 1
+            print(f"    batch {batch_num}/{n_batches}", end="\r")
             batch_out = sess.run(output_names, {"input": batch})[0]
             for j, (y, x) in enumerate(batch_coords):
                 out[y:y + win_size, x:x + win_size] += batch_out[j]
                 mask[y:y + win_size, x:x + win_size] += 1
             del batch, batch_out
+        t_infer = time.perf_counter() - t_infer_start
+        print(f"    {len(patches)} patches in {t_infer:.1f}s  ({t_infer / len(patches) * 1000:.0f}ms/patch)")
 
         del patches
         out /= mask
