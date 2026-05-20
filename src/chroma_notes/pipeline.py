@@ -1,13 +1,31 @@
 from __future__ import annotations
 
+import os
 import tempfile
 import time
 from pathlib import Path
 
 import fitz
 
-from .omr import detect_notes
+from .omr import NoteDetection, detect_notes
 from .overlay import ColorMap, apply_overlays
+
+
+_modal_fn = None
+
+
+def _detect_notes(img_path: str) -> list[NoteDetection]:
+    if os.environ.get("USE_MODAL"):
+        try:
+            global _modal_fn
+            if _modal_fn is None:
+                import modal
+                _modal_fn = modal.Function.from_name("chroma-notes", "detect_notes_remote")
+            raw = _modal_fn.remote(Path(img_path).read_bytes())
+            return [NoteDetection(**d) for d in raw]
+        except Exception as exc:
+            print(f"  Modal failed ({exc}), falling back to local CPU")
+    return detect_notes(img_path)
 
 RENDER_DPI = 120  # higher → better OMR accuracy, slower
 
@@ -31,7 +49,7 @@ def process_pdf(input_path: str, output_path: str, colors: ColorMap | None = Non
 
         try:
             t0 = time.perf_counter()
-            detections = detect_notes(img_path)
+            detections = _detect_notes(img_path)
             t_omr = time.perf_counter() - t0
 
             t0 = time.perf_counter()
