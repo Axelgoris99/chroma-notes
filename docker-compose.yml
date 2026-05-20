@@ -8,6 +8,9 @@ services:
     mem_limit: 6g
     environment:
       - JOBS_DIR=/app/jobs
+      - USE_MODAL=1
+      - MODAL_TOKEN_ID=${MODAL_TOKEN_ID}
+      - MODAL_TOKEN_SECRET=${MODAL_TOKEN_SECRET}
     networks:
       - caddy
 
