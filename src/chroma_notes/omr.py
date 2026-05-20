@@ -13,6 +13,7 @@ import cv2
 import numpy as np
 
 
+
 @dataclass
 class NoteDetection:
     x1: int
@@ -42,12 +43,12 @@ def _get_or_load_session(onnx_path: str, model_path: str) -> dict:
         gc.collect()
 
     meta = pickle.load(open(os.path.join(model_path, "metadata.pkl"), "rb"))
-    # opts = rt.SessionOptions()
-    # opts.graph_optimization_level = rt.GraphOptimizationLevel.ORT_ENABLE_ALL
-    # opts.intra_op_num_threads = os.cpu_count() or 1
+    opts = rt.SessionOptions()
+    opts.graph_optimization_level = rt.GraphOptimizationLevel.ORT_ENABLE_ALL
+    opts.intra_op_num_threads = os.cpu_count() or 1
     providers = [("CUDAExecutionProvider", {"device_id": 0}), "CPUExecutionProvider"]
     t0 = time.perf_counter()
-    sess = rt.InferenceSession(onnx_path, providers=providers)
+    sess = rt.InferenceSession(onnx_path, providers=providers, sess_options=opts)
     active = sess.get_providers()
     print(f"  Loaded {os.path.basename(onnx_path)} via {active[0]} in {time.perf_counter() - t0:.1f}s")
 
