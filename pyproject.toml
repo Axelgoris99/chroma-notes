@@ -11,6 +11,10 @@ dependencies = [
     "fastapi>=0.111",
     "uvicorn[standard]>=0.29",
     "python-multipart>=0.0.9",
+    "nvidia-cublas-cu12>=12.9.2.10",
+    "nvidia-cuda-runtime-cu12>=12.9.79",
+    "nvidia-cudnn-cu12>=9.22.0.52",
+    "nvidia-cufft-cu12>=11.4.1.4",
 ]
 
 [project.scripts]
