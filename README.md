@@ -34,6 +34,22 @@ uv run chroma-notes input.pdf output.pdf
 
 > On first run oemer will download its model checkpoints (~200 MB).
 
+### GPU acceleration (optional)
+
+If you have an NVIDIA GPU, processing drops from ~5 min/page to a few seconds. The nvidia CUDA libraries live in a separate dependency group so they don't bloat the production Docker image.
+
+```bash
+uv sync --group gpu   # installs nvidia-cublas/cudnn/cufft/cuda-runtime into the venv
+```
+
+Then use `start.sh` instead of `uv run` to launch the web server — it sets `LD_LIBRARY_PATH` to point at those pip-installed libs before starting uvicorn (the dynamic linker won't find them otherwise):
+
+```bash
+uv run ./start.sh
+```
+
+`uv run chroma-notes …` (the CLI) still works fine on CPU without any of this.
+
 ---
 
 ## Web app with Docker
