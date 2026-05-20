@@ -40,10 +40,6 @@ source = { editable = "." }
 dependencies = [
     { name = "click" },
     { name = "fastapi" },
-    { name = "nvidia-cublas-cu12" },
-    { name = "nvidia-cuda-runtime-cu12" },
-    { name = "nvidia-cudnn-cu12" },
-    { name = "nvidia-cufft-cu12" },
     { name = "oemer" },
     { name = "opencv-python-headless" },
     { name = "pymupdf" },
@@ -51,19 +47,31 @@ dependencies = [
     { name = "uvicorn", extra = ["standard"] },
 ]
 
+[package.dev-dependencies]
+gpu = [
+    { name = "nvidia-cublas-cu12" },
+    { name = "nvidia-cuda-runtime-cu12" },
+    { name = "nvidia-cudnn-cu12" },
+    { name = "nvidia-cufft-cu12" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.1" },
     { name = "fastapi", specifier = ">=0.111" },
-    { name = "nvidia-cublas-cu12", specifier = ">=12.9.2.10" },
-    { name = "nvidia-cuda-runtime-cu12", specifier = ">=12.9.79" },
-    { name = "nvidia-cudnn-cu12", specifier = ">=9.22.0.52" },
-    { name = "nvidia-cufft-cu12", specifier = ">=11.4.1.4" },
     { name = "oemer" },
     { name = "opencv-python-headless", specifier = ">=4.8" },
     { name = "pymupdf", specifier = ">=1.24" },
     { name = "python-multipart", specifier = ">=0.0.9" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.29" },
+]
+
+[package.metadata.requires-dev]
+gpu = [
+    { name = "nvidia-cublas-cu12", specifier = ">=12.9.2.10" },
+    { name = "nvidia-cuda-runtime-cu12", specifier = ">=12.9.79" },
+    { name = "nvidia-cudnn-cu12", specifier = ">=9.22.0.52" },
+    { name = "nvidia-cufft-cu12", specifier = ">=11.4.1.4" },
 ]
 
 [[package]]
