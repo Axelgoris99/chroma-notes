@@ -52,6 +52,22 @@ uv run ./start.sh
 
 ---
 
+## GPU via Modal (optional)
+
+Setting `USE_MODAL=1` offloads the OMR step to a [Modal](https://modal.com) GPU function instead of running it locally. This is how the public demo at <https://chroma.goris.live> avoids a 6 GB GPU dependency in the server container.
+
+You also need to supply your Modal credentials:
+
+```
+USE_MODAL=1
+MODAL_TOKEN_ID=<your-token-id>
+MODAL_TOKEN_SECRET=<your-token-secret>
+```
+
+If the Modal call fails for any reason the pipeline falls back to local CPU automatically.
+
+---
+
 ## Web app with Docker
 
 Build and run locally:
