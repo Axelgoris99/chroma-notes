@@ -181,6 +181,7 @@
   }
   footer a { color: inherit; text-underline-offset: 3px; }
 </style>
+<script async src="https://umami.goris.live/script.js" data-website-id="0858bde0-5332-434d-90b3-3ebeca2c7ab1"></script>
 </head>
 <body>
 
@@ -295,6 +296,8 @@
     if (!file.name.toLowerCase().endsWith('.pdf')) { showErr(uploadErr, 'Only PDF files are accepted.'); return; }
     if (file.size > 50 * 1024 * 1024) { showErr(uploadErr, 'File exceeds 50 MB limit.'); return; }
 
+    umami.track('upload_started', { file_size_mb: +(file.size / 1024 / 1024).toFixed(2) });
+
     uploadErr.classList.add('hidden');
     uploadBarW.classList.remove('hidden');
     dropZone.style.pointerEvents = 'none';
@@ -312,6 +315,7 @@
       if (xhr.status === 200) {
         const data = JSON.parse(xhr.responseText);
         jobId = data.job_id;
+        umami.track('upload_success');
         switchToStatus();
         poll();
         pollTimer = setInterval(poll, 3000);
@@ -371,6 +375,7 @@
       statusBar.style.width = '100%';
       downloadBtn.href = '/download/' + jobId;
       downloadBtn.classList.remove('hidden');
+      downloadBtn.onclick = () => umami.track('download_clicked');
     } else if (data.status === 'failed') {
       clearInterval(pollTimer);
       statusVal.textContent = 'Failed';
@@ -381,6 +386,7 @@
   }
 
   function reset() {
+    umami.track('process_another');
     clearInterval(pollTimer);
     jobId = null;
     uploadSec.style.display = '';
